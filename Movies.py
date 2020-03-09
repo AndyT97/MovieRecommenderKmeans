@@ -216,10 +216,10 @@ ratings_title = pd.merge(ratings, movies[['movieId','title']], on='movieId')
 user_movie_ratings = pd.pivot_table(ratings_title, index='userId', columns='title', values='rating')
 
 # Print the number of dimensions and a subset of the dataset
-print('dataset dimensions: ', user_movie_ratings.shape, '\n\nSubset example:')
+#print('dataset dimensions: ', user_movie_ratings.shape, '\n\nSubset example:')
 #After printing this we see a lot of NaN values because most users have not rated most of the movies
 #We will sort the dataset by the most rated movies
-print(user_movie_ratings.iloc[:6, :10])
+#print(user_movie_ratings.iloc[:6, :10])
 
 #Define function to get most rated movies
 
@@ -228,9 +228,64 @@ def get_most_rated_movies(user_movie_ratings, max_number_of_movies):
     user_movie_ratings = user_movie_ratings.append(user_movie_ratings.count(), ignore_index = True)
     #2 - Sort
     user_movie_ratings_sorted = user_movie_ratings.sort_values(len(user_movie_ratings) - 1, axis=1, ascending=False)
-
+    user_movie_ratings_sorted.drop(user_movie_ratings_sorted.tail(1).index)
+    #3 - Slice
+    most_rated_movies = user_movie_ratings_sorted.iloc[:max_number_of_movies]
+    return most_rated_movies
 
 
 #Sorting by rating function
 def sort_by_rating_density (user_movie, n_movies, n_users):
     most_rated_movies = get_most_rated_movies(user_movie_ratings, n_movies)
+    #TODO Define function
+    #most_rated_movies = get_users_who_rate_most(most_rated_movies,n_users)
+    return most_rated_movies
+
+n_movies = 30
+n_users = 18
+most_rated_movies_users_selection = sort_by_rating_density(user_movie_ratings, n_movies, n_users)
+
+#print('dataset dimensions')
+#most_rated_movies_users_selection.shape()
+#print(most_rated_movies_users_selection.head())
+
+#Pivot the dataset and choose the first 1000 movies
+user_movie_ratings =  pd.pivot_table(ratings_title, index='userId', columns= 'title', values='rating')
+most_rated_movies_1k = get_most_rated_movies(user_movie_ratings, 1000)
+
+#sparse_ratings = csr_matrix(pd.SparseDataFrame(most_rated_movies_1k).to_coo())
+
+# 20 clusters
+#predictions = KMeans(n_clusters=20, algorithm='full').fit_predict(sparse_ratings)
+# Select the mas number of users and movies heatmap cluster
+max_users = 70
+max_movies = 50
+
+# Cluster and print some of them
+clustered = pd.concat([most_rated_movies_1k.reset_index(), pd.DataFrame({'group':predictions})], axis=1)
+#draw_movie_clusters(clustered, max_users, max_movies)
+
+# # Pick a cluster ID from the clusters above
+cluster_number = 11
+# Let's filter to only see the region of the dataset with the most number of values
+n_users = 75
+n_movies = 300
+cluster = clustered[clustered.group == cluster_number].drop(['index', 'group'], axis=1)
+# Sort and print the cluster
+cluster = sort_by_rating_density(cluster, n_movies, n_users)
+#draw_movies_heatmap(cluster, axis_labels=False)
+#
+# # Fill in the name of the column/movie. e.g. 'Forrest Gump (1994)'
+# movie_name = "Matrix, The (1999)"
+# cluster[movie_name].mean()
+
+# Pick a user ID from the dataset
+user_id = 10
+# Get all this user's ratings
+user_2_ratings  = cluster.loc[user_id, :]
+# Which movies did they not rate?
+user_2_unrated_movies =  user_2_ratings[user_2_ratings.isnull()]
+# What are the ratings of these movies the user did not rate?
+avg_ratings = pd.concat([user_2_unrated_movies, cluster.mean()], axis=1, join='inner').loc[:,0]
+# Let's sort by rating so the highest rated movies are presented first
+print(avg_ratings.sort_values(ascending=False)[:20])
